@@ -1,4 +1,4 @@
 radplex
 =======
 
-RADSeq demultiplexing tool
+RADSeq demultiplexing tool.

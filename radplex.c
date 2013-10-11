@@ -47,6 +47,9 @@ char* adaptors[2][MAX_ADAPTORS];
 int n_adaptors[2];
 FILE* undetermined_fp[2];
 FILE* out_fp[MAX_ADAPTORS][MAX_ADAPTORS][2];
+int adaptor_counts[MAX_ADAPTORS][MAX_ADAPTORS];
+int undetermined_read_count = 0;
+int total_read_count = 0;
 
 /*----------------------------------------------------------------------*
  * Function:   chomp
@@ -272,12 +275,12 @@ int match_adaptor(char*seq, int n)
  * Parameters: 
  * Returns:    
  *----------------------------------------------------------------------*/
-void write_read(FastqRead* read, FILE* fp)
+void write_read(FastqRead* read, int trim_start, FILE* fp)
 {
     fprintf(fp, "%s\n", read->sequence_header);
-    fprintf(fp, "%s\n", read->sequence);
+    fprintf(fp, "%s\n", (read->sequence) + trim_start);
     fprintf(fp, "%s\n", read->qualities_header);
-    fprintf(fp, "%s\n", read->qualities);
+    fprintf(fp, "%s\n", (read->qualities) + trim_start);
 }
 
 /*----------------------------------------------------------------------*
@@ -300,6 +303,8 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
     FILE* out_r1 = undetermined_fp[0];
     FILE* out_r2 = undetermined_fp[1];
     
+    total_read_count++;
+    
     // Get p2 from index read
     strncpy(p2, read_pair->read[2].sequence, 7);
     p2[7] = 0;
@@ -312,11 +317,20 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
     //    strncpy(p1, read_pair->read[0].sequence, 6);
     //    p1[6]=0;
     //    printf("    Detected XmaI from base 7 with %d mismatches: %s-CCGGG p2 is %s\n", m, p1, p2);
-    //    write_read(&read_pair->read[0], xmai_r1_fp);
-    //    write_read(&read_pair->read[1], xmai_r2_fp);
+    //    write_read(&read_pair->read[0], 0, xmai_r1_fp);
+    //    write_read(&read_pair->read[1], 0, xmai_r2_fp);
     //    matched = 1;
     //} else {
 
+    for (i=0; i<n_adaptors[0]; i++) {
+        if (compare_sequence(read_pair->read[0].sequence, adaptors[0][i], strlen(adaptors[0][i])) <= allowed_mismatches) {
+            p1_index = i;
+            matched = 1;
+            break;
+        }
+    }
+    
+    /*
     for (o=4; o<=7; o++) {
         m = compare_sequence(read_pair->read[0].sequence + o, "TGCAG", 5);
         if (m <= allowed_mismatches) {
@@ -326,7 +340,7 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
             //printf("    Detected PstI from base %d with %d mismatches: %s-TGCAG p2 is %s\n", o+1, m, p1, p2);
             matched = 1;
         }
-    }
+    }*/
     
     if ((matched) && (p1_index >=0) && (p2_index >=0)) {
         //printf("p1=%s (%d)\tp2=%s (%d)\n", p1, p1_index, p2, p2_index);
@@ -334,7 +348,7 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
             int i;
             for (i=0; i<2; i++) {
                 char filename[MAX_PATH_LENGTH];
-                sprintf(filename, "%s_%c%d_R%d.fastq", output_prefix, p2_index+'A', p1_index+1, i);
+                sprintf(filename, "%s_%c%d_R%d.fastq", output_prefix, p2_index+'A', p1_index+1, i+1);
                 out_fp[p1_index][p2_index][i] = fopen(filename, "w");
                 if (!out_fp[p1_index][p2_index][i]) {
                     printf("Can't open %s\n", filename);
@@ -346,14 +360,16 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
         }
         out_r1 = out_fp[p1_index][p2_index][0];
         out_r2 = out_fp[p1_index][p2_index][1];
+        adaptor_counts[p1_index][p2_index]++;
     } else {
         //printf("No match\n");
         out_r1 = undetermined_fp[0];
         out_r2 = undetermined_fp[1];
+        undetermined_read_count++;
     }
 
-    write_read(&read_pair->read[0], out_r1);
-    write_read(&read_pair->read[1], out_r2);
+    write_read(&read_pair->read[0], strlen(adaptors[0][p1_index]), out_r1);
+    write_read(&read_pair->read[1], 0, out_r2);
 }
 
 /*----------------------------------------------------------------------*
@@ -417,7 +433,7 @@ void read_files(FastqReadPair* read_pair)
  *----------------------------------------------------------------------*/
 void load_adaptor_files(void)
 {
-    int i;
+    int i,j;
     
     for (i=0; i<2; i++) {
         FILE* fp = fopen(adaptor_filename[i], "r");
@@ -441,6 +457,11 @@ void load_adaptor_files(void)
                         } else {
                             printf("%c. %s\n", n_adaptors[i]+'A', adaptors[i][n_adaptors[i]]);
                         }
+                        
+                        if (i == 0) {
+                            strcat(adaptors[i][n_adaptors[i]], "TGCAG");
+                        }
+                        
                         n_adaptors[i]++;
                     }
                 }
@@ -450,6 +471,44 @@ void load_adaptor_files(void)
             exit(4);
         }
     }
+    
+    for (i=0; i<n_adaptors[0]; i++) {
+        for (j=0; j<n_adaptors[1]; j++) {
+            adaptor_counts[i][j] = 0;
+        }
+    }
+    
+    printf("\n");
+}
+
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
+void display_counts(void)
+{
+    double percent = 0.0;
+    int i, j;
+    
+    printf("\nCat\tP1\tP2\tCount\tPercent\n");
+    
+    for (j=0; j<n_adaptors[1]; j++) {
+        for (i=0; i<n_adaptors[0]; i++) {
+            percent = 0.0;
+            if (adaptor_counts[i][j] > 0) {
+                percent = (100.0 * adaptor_counts[i][j]) / total_read_count;
+            }
+            printf("%c%d\t%s\t%s\t%d\t%.2f\n", j+'A', i, adaptors[0][i], adaptors[1][j], adaptor_counts[i][j], percent);
+        }
+    }
+    
+    if (undetermined_read_count > 0) {
+        percent = (100.0 * undetermined_read_count) / total_read_count;
+    }
+    printf("Und\t\t\t%d\t%.2f\n", undetermined_read_count, percent);
+    printf("Total\t\t\t%d\t100\n", total_read_count);
 }
 
 /*----------------------------------------------------------------------*
@@ -485,6 +544,7 @@ int main(int argc, char* argv[])
     parse_command_line(argc, argv, &read_pair);
     load_adaptor_files();
     read_files(&read_pair);
+    display_counts();
     
     printf("\nDone.\n");
     

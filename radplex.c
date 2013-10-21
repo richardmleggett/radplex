@@ -186,6 +186,8 @@ void parse_command_line(int argc, char* argv[], FastqReadPair* read_pair)
         printf("Error: you must specify adaptor files.\n");
         exit(3);
     }
+
+    printf("Allowed mismatches: %d\n", allowed_mismatches);
 }
 
 
@@ -300,6 +302,7 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
     int matched = 0;
     int p1_index = -1;
     int p2_index = -1;
+    int clip_size = 0;
     FILE* out_r1 = undetermined_fp[0];
     FILE* out_r2 = undetermined_fp[1];
     
@@ -360,15 +363,17 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
         }
         out_r1 = out_fp[p1_index][p2_index][0];
         out_r2 = out_fp[p1_index][p2_index][1];
+        clip_size = strlen(adaptors[0][p1_index]);
         adaptor_counts[p1_index][p2_index]++;
     } else {
         //printf("No match\n");
         out_r1 = undetermined_fp[0];
         out_r2 = undetermined_fp[1];
+        clip_size = 0;
         undetermined_read_count++;
     }
 
-    write_read(&read_pair->read[0], strlen(adaptors[0][p1_index]), out_r1);
+    write_read(&read_pair->read[0], clip_size, out_r1);
     write_read(&read_pair->read[1], 0, out_r2);
 }
 
@@ -500,7 +505,7 @@ void display_counts(void)
             if (adaptor_counts[i][j] > 0) {
                 percent = (100.0 * adaptor_counts[i][j]) / total_read_count;
             }
-            printf("%c%d\t%s\t%s\t%d\t%.2f\n", j+'A', i, adaptors[0][i], adaptors[1][j], adaptor_counts[i][j], percent);
+            printf("%c%d\t%s\t%s\t%d\t%.2f\n", j+'A', i+1, adaptors[0][i], adaptors[1][j], adaptor_counts[i][j], percent);
         }
     }
     
@@ -534,7 +539,7 @@ int main(int argc, char* argv[])
 {
     FastqReadPair read_pair;
     
-    printf("\nRADplex v0.2\n\n");
+    printf("\nRADplex v0.3\n\n");
     
     adaptor_filename[0][0] = 0;
     adaptor_filename[1][0] = 0;

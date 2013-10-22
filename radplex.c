@@ -187,7 +187,7 @@ void parse_command_line(int argc, char* argv[], FastqReadPair* read_pair)
         exit(3);
     }
 
-    printf("Allowed mismatches: %d\n", allowed_mismatches);
+    printf("Allowed mismatches: %d\n\n", allowed_mismatches);
 }
 
 

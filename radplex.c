@@ -89,107 +89,55 @@ void usage(void)
 }
 
 /*----------------------------------------------------------------------*
- * Function:   parse_command_line
- * Purpose:    Parse command line options
- * Parameters: argc = number of arguments
- *             argv -> array of arguments
- * Returns:    None
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
  *----------------------------------------------------------------------*/
-void parse_command_line(int argc, char* argv[], FastqReadPair* read_pair)
+char* assign_string(char* s)
 {
-    static struct option long_options[] = {
-        {"one", required_argument, NULL, 'a'},
-        {"two", required_argument, NULL, 'b'},
-        {"index", required_argument, NULL, 'c'},
-        {"help", no_argument, NULL, 'h'},
-        {"mismatches", required_argument, NULL, 'm'},
-        {"output_prefix", required_argument, NULL, 'p'},
-        {"verbose", no_argument, NULL, 'v'},
-        {"p1", required_argument, NULL, '1'},
-        {"p2", required_argument, NULL, '2'},
-        {0, 0, 0, 0}
-    };
-    int opt;
-    int longopt_index;
-
-    while ((opt = getopt_long(argc, argv, "a:b:c:hm:p:v1:2:", long_options, &longopt_index)) > 0)
-    {
-        switch(opt) {
-            case 'h':
-                usage();
-                exit(0);
-                break;
-            case 'a':
-                if (optarg==NULL) {
-                    printf("Error: Option requires an argument.\n");
-                    exit(1);
-                }
-                read_pair->input_filename[0] = malloc(strlen(optarg)+1);
-                strcpy(read_pair->input_filename[0], optarg);
-                break;
-            case 'b':
-                if (optarg==NULL) {
-                    printf("Error: Option requires an argument.\n");
-                    exit(1);
-                }
-                read_pair->input_filename[1] = malloc(strlen(optarg)+1);
-                strcpy(read_pair->input_filename[1], optarg);
-                break;
-            case 'c':
-                if (optarg==NULL) {
-                    printf("Error: Option requires an argument.\n");
-                    exit(1);
-                }
-                read_pair->input_filename[2] = malloc(strlen(optarg)+1);
-                strcpy(read_pair->input_filename[2], optarg);
-                break;
-            case 'm':
-                if (optarg==NULL) {
-                    printf("Error: Option requires an argument.\n");
-                    exit(1);
-                }
-                allowed_mismatches=atoi(optarg);
-                break;
-            case 'p':
-                if (optarg==NULL) {
-                    printf("Error: Option requires an argument.\n");
-                    exit(1);
-                }
-                strcpy(output_prefix, optarg);
-                break;
-            case 'v':
-                verbose = 1;
-                break;
-            case '1':
-                if (optarg==NULL) {
-                    printf("Error: Option requires an argument.\n");
-                    exit(1);
-                }
-                strcpy(adaptor_filename[0], optarg);
-                break;
-            case '2':
-                if (optarg==NULL) {
-                    printf("Error: Option requires an argument.\n");
-                    exit(1);
-                }
-                strcpy(adaptor_filename[1], optarg);
-                break;
-        }
+    char* r = malloc(strlen(s)+1);
+    if (!r) {
+        printf("Error: can't assign string %s\n",s);
+        exit(12);
     }
     
-    if ((read_pair->input_filename[0] == 0) || (read_pair->input_filename[1] == 0) || (read_pair->input_filename[2] == 0)) {
-        printf("Error: you must specify both reads.\n");
-        exit(2);
-    }
-    
-    if ((adaptor_filename[0][0] == 0) || (adaptor_filename[1][0] == 0)) {
-        printf("Error: you must specify adaptor files.\n");
-        exit(3);
-    }
-
-    printf("Allowed mismatches: %d\n\n", allowed_mismatches);
+    strcpy(r, s);
+    return r;
 }
 
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
+void setup_default_adaptors(void)
+{
+    n_adaptors[0] = 12;
+    adaptors[0][0]  = assign_string("TGAGTGCAG");
+    adaptors[0][1]  = assign_string("ACGTATGCAG");
+    adaptors[0][2]  = assign_string("CTCCGATGCAG");
+    adaptors[0][3]  = assign_string("GATACCATGCAG");
+    adaptors[0][4]  = assign_string("GGCATGCAG");
+    adaptors[0][5]  = assign_string("CTAGGTGCAG");
+    adaptors[0][6]  = assign_string("ACGCACTGCAG");
+    adaptors[0][7]  = assign_string("TATTCAATGCAG");
+    adaptors[0][8]  = assign_string("GTATTGCAG");
+    adaptors[0][9]  = assign_string("TACGTTGCAG");
+    adaptors[0][10] = assign_string("CCGCACTGCAG");
+    adaptors[0][11] = assign_string("AGTAGAATGCAG");
+
+    n_adaptors[1] = 8;
+    adaptors[1][0] = assign_string("AATAGTT");
+    adaptors[1][1] = assign_string("ACCGACC");
+    adaptors[1][2] = assign_string("ATGGCAA");
+    adaptors[1][3] = assign_string("CCGGTCG");
+    adaptors[1][4] = assign_string("GACCTGG");
+    adaptors[1][5] = assign_string("GTTCGGT");
+    adaptors[1][6] = assign_string("TGAACTA");
+    adaptors[1][7] = assign_string("TGATAAC");
+}
 
 /*----------------------------------------------------------------------*
  * Function:   
@@ -436,6 +384,31 @@ void read_files(FastqReadPair* read_pair)
  * Parameters:
  * Returns:
  *----------------------------------------------------------------------*/
+void display_adaptors(void)
+{
+    int i,j;
+    
+    for (i=0; i<2; i++) {
+        printf("P%d adaptors:\n", i);
+        for (j=0; j<n_adaptors[i]; j++) {
+            if (i == 0) {
+                printf("  %d. %s\n", j, adaptors[i][j]);
+            } else {
+                printf("  %c. %s\n", j+'A', adaptors[i][j]);
+            }
+            adaptor_counts[i][j] = 0;
+        }
+    }
+    
+    printf("\n");
+}
+
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
 void load_adaptor_files(void)
 {
     int i,j;
@@ -457,11 +430,6 @@ void load_adaptor_files(void)
                             exit(5);
                         }
                         strcpy(adaptors[i][n_adaptors[i]], string);
-                        if (i == 0) {
-                            printf("%d. %s\n", n_adaptors[i], adaptors[i][n_adaptors[i]]);
-                        } else {
-                            printf("%c. %s\n", n_adaptors[i]+'A', adaptors[i][n_adaptors[i]]);
-                        }
                         
                         if (i == 0) {
                             strcat(adaptors[i][n_adaptors[i]], "TGCAG");
@@ -474,12 +442,6 @@ void load_adaptor_files(void)
         } else {
             printf("Error: Can't open %s\n", adaptor_filename[i]);
             exit(4);
-        }
-    }
-    
-    for (i=0; i<n_adaptors[0]; i++) {
-        for (j=0; j<n_adaptors[1]; j++) {
-            adaptor_counts[i][j] = 0;
         }
     }
     
@@ -531,7 +493,111 @@ void initialise_read_pair_struct(FastqReadPair* r)
         r->input_fp[i] = 0;
     }
 }
-            
+
+/*----------------------------------------------------------------------*
+ * Function:   parse_command_line
+ * Purpose:    Parse command line options
+ * Parameters: argc = number of arguments
+ *             argv -> array of arguments
+ * Returns:    None
+ *----------------------------------------------------------------------*/
+void parse_command_line(int argc, char* argv[], FastqReadPair* read_pair)
+{
+    static struct option long_options[] = {
+        {"one", required_argument, NULL, 'a'},
+        {"two", required_argument, NULL, 'b'},
+        {"index", required_argument, NULL, 'c'},
+        {"help", no_argument, NULL, 'h'},
+        {"mismatches", required_argument, NULL, 'm'},
+        {"output_prefix", required_argument, NULL, 'p'},
+        {"verbose", no_argument, NULL, 'v'},
+        {"p1", required_argument, NULL, '1'},
+        {"p2", required_argument, NULL, '2'},
+        {0, 0, 0, 0}
+    };
+    int opt;
+    int longopt_index;
+    
+    while ((opt = getopt_long(argc, argv, "a:b:c:hm:p:v1:2:", long_options, &longopt_index)) > 0)
+    {
+        switch(opt) {
+            case 'h':
+                usage();
+                exit(0);
+                break;
+            case 'a':
+                if (optarg==NULL) {
+                    printf("Error: Option requires an argument.\n");
+                    exit(1);
+                }
+                read_pair->input_filename[0] = malloc(strlen(optarg)+1);
+                strcpy(read_pair->input_filename[0], optarg);
+                break;
+            case 'b':
+                if (optarg==NULL) {
+                    printf("Error: Option requires an argument.\n");
+                    exit(1);
+                }
+                read_pair->input_filename[1] = malloc(strlen(optarg)+1);
+                strcpy(read_pair->input_filename[1], optarg);
+                break;
+            case 'c':
+                if (optarg==NULL) {
+                    printf("Error: Option requires an argument.\n");
+                    exit(1);
+                }
+                read_pair->input_filename[2] = malloc(strlen(optarg)+1);
+                strcpy(read_pair->input_filename[2], optarg);
+                break;
+            case 'm':
+                if (optarg==NULL) {
+                    printf("Error: Option requires an argument.\n");
+                    exit(1);
+                }
+                allowed_mismatches=atoi(optarg);
+                break;
+            case 'p':
+                if (optarg==NULL) {
+                    printf("Error: Option requires an argument.\n");
+                    exit(1);
+                }
+                strcpy(output_prefix, optarg);
+                break;
+            case 'v':
+                verbose = 1;
+                break;
+            case '1':
+                if (optarg==NULL) {
+                    printf("Error: Option requires an argument.\n");
+                    exit(1);
+                }
+                strcpy(adaptor_filename[0], optarg);
+                break;
+            case '2':
+                if (optarg==NULL) {
+                    printf("Error: Option requires an argument.\n");
+                    exit(1);
+                }
+                strcpy(adaptor_filename[1], optarg);
+                break;
+        }
+    }
+    
+    if ((read_pair->input_filename[0] == 0) || (read_pair->input_filename[1] == 0) || (read_pair->input_filename[2] == 0)) {
+        printf("Error: you must specify both reads.\n");
+        exit(2);
+    }
+    
+    if ((adaptor_filename[0][0] == 0) || (adaptor_filename[1][0] == 0)) {
+        printf("Using default adaptors.\n");
+        setup_default_adaptors();
+    } else {
+        load_adaptor_files();
+    }
+    
+    printf("Allowed mismatches: %d\n\n", allowed_mismatches);
+}
+
 /*----------------------------------------------------------------------*
  * Function:   main
  *----------------------------------------------------------------------*/
@@ -547,7 +613,7 @@ int main(int argc, char* argv[])
     
     initialise_read_pair_struct(&read_pair);
     parse_command_line(argc, argv, &read_pair);
-    load_adaptor_files();
+    display_adaptors();
     read_files(&read_pair);
     display_counts();
     

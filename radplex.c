@@ -50,6 +50,7 @@ FILE* out_fp[MAX_ADAPTORS][MAX_ADAPTORS][2];
 int adaptor_counts[MAX_ADAPTORS][MAX_ADAPTORS];
 int undetermined_read_count = 0;
 int total_read_count = 0;
+int clip_psti = 0;
 
 /*----------------------------------------------------------------------*
  * Function:   chomp
@@ -83,6 +84,7 @@ void usage(void)
            "    [-m | --mismatches] Number of allowed mismatches (default 1).\n" \
            "    [-p | --output_prefix] Output filename prefix.\n" \
            "    [-v | --verbose] Verbose output.\n" \
+           "    [-z | --clip_psti] Clip PstI sequence too.\n" \
            "    [-1 | --p1] p1 Adaptor file.\n" \
            "    [-2 | --p2] p2 Adaptor file.\n" \
            "\n");
@@ -312,6 +314,9 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
         out_r1 = out_fp[p1_index][p2_index][0];
         out_r2 = out_fp[p1_index][p2_index][1];
         clip_size = strlen(adaptors[0][p1_index]);
+        if (clip_psti == 0) {
+            clip_size -= 5;
+        }
         adaptor_counts[p1_index][p2_index]++;
     } else {
         //printf("No match\n");
@@ -511,6 +516,7 @@ void parse_command_line(int argc, char* argv[], FastqReadPair* read_pair)
         {"mismatches", required_argument, NULL, 'm'},
         {"output_prefix", required_argument, NULL, 'p'},
         {"verbose", no_argument, NULL, 'v'},
+        {"clip_psti", no_argument, NULL, 'z'},
         {"p1", required_argument, NULL, '1'},
         {"p2", required_argument, NULL, '2'},
         {0, 0, 0, 0}
@@ -518,7 +524,7 @@ void parse_command_line(int argc, char* argv[], FastqReadPair* read_pair)
     int opt;
     int longopt_index;
     
-    while ((opt = getopt_long(argc, argv, "a:b:c:hm:p:v1:2:", long_options, &longopt_index)) > 0)
+    while ((opt = getopt_long(argc, argv, "a:b:c:hm:p:vz1:2:", long_options, &longopt_index)) > 0)
     {
         switch(opt) {
             case 'h':
@@ -566,6 +572,9 @@ void parse_command_line(int argc, char* argv[], FastqReadPair* read_pair)
             case 'v':
                 verbose = 1;
                 break;
+            case 'z':
+                clip_psti = 1;
+                break;
             case '1':
                 if (optarg==NULL) {
                     printf("Error: Option requires an argument.\n");
@@ -605,7 +614,7 @@ int main(int argc, char* argv[])
 {
     FastqReadPair read_pair;
     
-    printf("\nRADplex v0.3\n\n");
+    printf("\nRADplex v0.4\n\n");
     
     adaptor_filename[0][0] = 0;
     adaptor_filename[1][0] = 0;

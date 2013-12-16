@@ -19,7 +19,6 @@
 #define MAX_READ_LENGTH 10000
 #define MAX_ADAPTORS 100
 #define MAX_PATH_LENGTH 1024
-#define MAX_UNDETERMINED 1000000
 #define MAX_HASH 7
 #define UNDETERMINED_HASH_SIZE 279936
 
@@ -53,7 +52,7 @@ FILE* undetermined_fp[2];
 FILE* out_fp[MAX_ADAPTORS][MAX_ADAPTORS][2];
 int adaptor_counts[MAX_ADAPTORS][MAX_ADAPTORS];
 int undetermined_read_count = 0;
-char undetermined_indices[2][UNDETERMINED_HASH_SIZE];
+int undetermined_indices[2][UNDETERMINED_HASH_SIZE];
 int total_read_count = 0;
 int clip_psti = 0;
 
@@ -112,6 +111,7 @@ void initialise_main(void)
     for (i=0; i<2; i++) {
         for (j=0; j<UNDETERMINED_HASH_SIZE; j++) {
             undetermined_indices[i][j] = 0;
+            
         }
     }
 }
@@ -243,7 +243,8 @@ char* hash_to_string(int hash, char* hash_string)
 void store_undetermined(int p, char* index)
 {
     if (index[0] != 0) {
-        undetermined_indices[p][generate_hash(index)]++;
+        int hash = generate_hash(index);
+        undetermined_indices[p][hash] = undetermined_indices[p][hash] + 1;
     }
 }
 
@@ -260,13 +261,12 @@ void output_undetermined_indices(void)
     FILE* fp;
     char filename[1024];
     
-    
     for (i=0; i<2; i++) {
         sprintf(filename, "%s_p%d_undetermined_counts.txt", output_prefix, i+1);
         fp = fopen(filename, "w");
         if (fp) {
             for (j=0; j<UNDETERMINED_HASH_SIZE; j++) {
-                if (undetermined_indices[i][j] > 0) {
+                if (undetermined_indices[i][j] != 0) {
                     hash_to_string(j, hash_string);
                     fprintf(fp, "%s\t%d\n", hash_string, undetermined_indices[i][j]);
                 }
@@ -274,6 +274,7 @@ void output_undetermined_indices(void)
         } else {
             printf("ERROR: Can't open %s\n", filename);
         }
+        fclose(fp);
     }
 }
 

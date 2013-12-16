@@ -189,9 +189,7 @@ int generate_hash(char* sequence)
     int multiplier = 0;
     int hash = 0;
     int i, m;
-    
-    printf("Sequence: %s\n", sequence);
-    
+        
     if (!sequence) {
         printf("Error: Bad sequence\n");
         exit(1);

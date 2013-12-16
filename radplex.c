@@ -826,7 +826,7 @@ int main(int argc, char* argv[])
 {
     FastqReadPair read_pair;
     
-    printf("\nRADplex v0.4\n\n");
+    printf("\nRADplex v0.5\n\n");
     
     initialise_main();
 

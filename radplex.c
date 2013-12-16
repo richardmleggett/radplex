@@ -11,6 +11,7 @@
 #include <string.h>
 #include <getopt.h> 
 #include <ctype.h>
+#include <math.h>
 
 /*----------------------------------------------------------------------*
  * Constants
@@ -18,6 +19,9 @@
 #define MAX_READ_LENGTH 10000
 #define MAX_ADAPTORS 100
 #define MAX_PATH_LENGTH 1024
+#define MAX_UNDETERMINED 1000000
+#define MAX_HASH 7
+#define UNDETERMINED_HASH_SIZE 279936
 
 /*----------------------------------------------------------------------*
  * Structures
@@ -49,6 +53,7 @@ FILE* undetermined_fp[2];
 FILE* out_fp[MAX_ADAPTORS][MAX_ADAPTORS][2];
 int adaptor_counts[MAX_ADAPTORS][MAX_ADAPTORS];
 int undetermined_read_count = 0;
+char undetermined_indices[2][UNDETERMINED_HASH_SIZE];
 int total_read_count = 0;
 int clip_psti = 0;
 
@@ -88,6 +93,190 @@ void usage(void)
            "    [-1 | --p1] p1 Adaptor file.\n" \
            "    [-2 | --p2] p2 Adaptor file.\n" \
            "\n");
+}
+
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
+void initialise_main(void)
+{
+    int i,j;
+    
+    adaptor_filename[0][0] = 0;
+    adaptor_filename[1][0] = 0;
+    strcpy(output_prefix, "RADplex_output");
+
+    for (i=0; i<2; i++) {
+        for (j=0; j<UNDETERMINED_HASH_SIZE; j++) {
+            undetermined_indices[i][j] = 0;
+        }
+    }
+}
+
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
+int base_to_n(char base)
+{
+    int n = -1;
+    
+    switch(base) {
+        case 'A':
+        case 'a':
+            n=1;
+            break;
+        case 'C':
+        case 'c':
+            n=2;
+            break;
+        case 'G':
+        case 'g':
+            n=3;
+            break;
+        case 'T':
+        case 't':
+            n=4;
+            break;
+        case 'N':
+        case 'n':
+            n=5;
+            break;
+        default:
+            printf("Error: Unknown base %c\n", base);
+            exit(3);
+            break;
+    }
+    
+    return n;
+}
+
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
+char n_to_base(int n)
+{
+    char base;
+    
+    switch (n) {
+        case 1: base = 'A'; break;
+        case 2: base = 'C'; break;
+        case 3: base = 'G'; break;
+        case 4: base = 'T'; break;
+        case 5: base = 'N'; break;
+        default: printf("Error: unknown n %d\n", n); exit(3); break;
+    }
+    
+    return base;
+}
+
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
+int generate_hash(char* sequence)
+{
+    int multiplier = 0;
+    int hash = 0;
+    int i, m;
+    
+    printf("Sequence: %s\n", sequence);
+    
+    if (!sequence) {
+        printf("Error: Bad sequence\n");
+        exit(1);
+    }
+    
+    if ((strlen(sequence) == 0) || (strlen(sequence) > 7)) {
+        printf("Error: Bad length for hash sequence\n");
+        exit(1);
+    }
+    
+    for (i=0; i<strlen(sequence); i++) {
+        m = (int)pow(6.0, (double)(MAX_HASH-1-i));
+        hash = hash + (base_to_n(sequence[i]) * m);
+    }
+    
+    return hash;
+}
+
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
+char* hash_to_string(int hash, char* hash_string)
+{
+    int i, n, m;
+    int running = hash;
+    int length = 0;
+    
+    for (i=0; i<MAX_HASH; i++) {
+        m = (int)pow(6.0, (double)(MAX_HASH-1-i));
+        if (running >= m) {
+            n = (running / m);
+            running -= (n * m);
+            hash_string[i] = n_to_base(n);
+        } else {
+            hash_string[i] = 0;
+        }
+    }
+
+    return hash_string;
+}
+
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
+void store_undetermined(int p, char* index)
+{
+    if (index[0] != 0) {
+        undetermined_indices[p][generate_hash(index)]++;
+    }
+}
+
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
+void output_undetermined_indices(void)
+{
+    int i,j;
+    char hash_string[8];
+    FILE* fp;
+    char filename[1024];
+    
+    
+    for (i=0; i<2; i++) {
+        sprintf(filename, "%s_p%d_undetermined_counts.txt", output_prefix, i+1);
+        fp = fopen(filename, "w");
+        if (fp) {
+            for (j=0; j<UNDETERMINED_HASH_SIZE; j++) {
+                if (undetermined_indices[i][j] > 0) {
+                    hash_to_string(j, hash_string);
+                    fprintf(fp, "%s\t%d\n", hash_string, undetermined_indices[i][j]);
+                }
+            }
+        } else {
+            printf("ERROR: Can't open %s\n", filename);
+        }
+    }
 }
 
 /*----------------------------------------------------------------------*
@@ -278,8 +467,22 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
     for (i=0; i<n_adaptors[0]; i++) {
         if (compare_sequence(read_pair->read[0].sequence, adaptors[0][i], strlen(adaptors[0][i])) <= allowed_mismatches) {
             p1_index = i;
+            strncpy(p1, read_pair->read[0].sequence, strlen(adaptors[0][i]));
+            p1[strlen(adaptors[0][i]) - 5] = 0;
             matched = 1;
             break;
+        }
+    }
+        
+    
+    if (p1_index < 0) {
+        p1[0] = 0;
+        for (o=4; o<=7; o++) {
+            m = compare_sequence(read_pair->read[0].sequence + o, "TGCAG", 5);
+            if (m <= allowed_mismatches) {
+               strncpy(p1, read_pair->read[0].sequence, o);
+               p1[o] = 0;
+            }
         }
     }
     
@@ -320,12 +523,21 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
         adaptor_counts[p1_index][p2_index]++;
     } else {
         //printf("No match\n");
+        
+        store_undetermined(0, p1);
+        store_undetermined(1, p2);
+        
         out_r1 = undetermined_fp[0];
         out_r2 = undetermined_fp[1];
         clip_size = 0;
         undetermined_read_count++;
     }
 
+    strcat(read_pair->read[0].sequence_header, " ");
+    strcat(read_pair->read[0].sequence_header, p1);
+    strcat(read_pair->read[0].sequence_header, "-");
+    strcat(read_pair->read[0].sequence_header, p2);
+    
     write_read(&read_pair->read[0], clip_size, out_r1);
     write_read(&read_pair->read[1], 0, out_r2);
 }
@@ -616,15 +828,19 @@ int main(int argc, char* argv[])
     
     printf("\nRADplex v0.4\n\n");
     
-    adaptor_filename[0][0] = 0;
-    adaptor_filename[1][0] = 0;
-    strcpy(output_prefix, "RADplex_output");
-    
+    initialise_main();
+
+    //store_undetermined(0, "AATAGTT");
+    //store_undetermined(0, "AATAGTT");
+    //store_undetermined(0, "AAT");
+
     initialise_read_pair_struct(&read_pair);
     parse_command_line(argc, argv, &read_pair);
     display_adaptors();
     read_files(&read_pair);
     display_counts();
+
+    output_undetermined_indices();
     
     printf("\nDone.\n");
     

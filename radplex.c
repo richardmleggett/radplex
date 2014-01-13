@@ -55,6 +55,7 @@ int undetermined_read_count = 0;
 int undetermined_indices[2][UNDETERMINED_HASH_SIZE];
 int total_read_count = 0;
 int clip_psti = 0;
+int p2_size = 7;
 
 /*----------------------------------------------------------------------*
  * Function:   chomp
@@ -87,6 +88,7 @@ void usage(void)
            "    [-c | --index] FASTQ index read.\n" \
            "    [-m | --mismatches] Number of allowed mismatches (default 1).\n" \
            "    [-p | --output_prefix] Output filename prefix.\n" \
+           "    [-s | --p2_size] Size of P2 adaptor read (default 7)." \
            "    [-v | --verbose] Verbose output.\n" \
            "    [-z | --clip_psti] Clip PstI sequence too.\n" \
            "    [-1 | --p1] p1 Adaptor file.\n" \
@@ -394,6 +396,28 @@ int compare_sequence(char* a, char* b, int l)
  * Parameters:
  * Returns:
  *----------------------------------------------------------------------*/
+int match_p2_adaptor(char*seq)
+{
+    int i;
+    int index = -1;
+    
+    for (i=0; i<n_adaptors[1]; i++) {
+        if (compare_sequence(seq, adaptors[1][i], p2_size) <=allowed_mismatches) {
+            index = i;
+            break;
+        }
+    }
+    
+    return index;
+}
+
+
+/*----------------------------------------------------------------------*
+ * Function:
+ * Purpose:
+ * Parameters:
+ * Returns:
+ *----------------------------------------------------------------------*/
 int match_adaptor(char*seq, int n)
 {
     int i;
@@ -447,10 +471,10 @@ void check_current_read_for_adaptors(FastqReadPair* read_pair)
     total_read_count++;
     
     // Get p2 from index read
-    strncpy(p2, read_pair->read[2].sequence, 7);
-    p2[7] = 0;
+    strncpy(p2, read_pair->read[2].sequence, p2_size);
+    p2[p2_size] = 0;
     
-    p2_index = match_adaptor(p2, 1);
+    p2_index = match_p2_adaptor(p2);
     
     // Deprecated XmaI detection
     //m = compare_sequence(read_pair->read[0].sequence + 6, "CCGGG", 5);
@@ -726,6 +750,7 @@ void parse_command_line(int argc, char* argv[], FastqReadPair* read_pair)
         {"help", no_argument, NULL, 'h'},
         {"mismatches", required_argument, NULL, 'm'},
         {"output_prefix", required_argument, NULL, 'p'},
+        {"p2_size", required_argument, NULL, 's'},
         {"verbose", no_argument, NULL, 'v'},
         {"clip_psti", no_argument, NULL, 'z'},
         {"p1", required_argument, NULL, '1'},
@@ -735,7 +760,7 @@ void parse_command_line(int argc, char* argv[], FastqReadPair* read_pair)
     int opt;
     int longopt_index;
     
-    while ((opt = getopt_long(argc, argv, "a:b:c:hm:p:vz1:2:", long_options, &longopt_index)) > 0)
+    while ((opt = getopt_long(argc, argv, "a:b:c:hm:p:s:vz1:2:", long_options, &longopt_index)) > 0)
     {
         switch(opt) {
             case 'h':
@@ -779,6 +804,13 @@ void parse_command_line(int argc, char* argv[], FastqReadPair* read_pair)
                     exit(1);
                 }
                 strcpy(output_prefix, optarg);
+                break;
+            case 's':
+                if (optarg==NULL) {
+                    printf("Error: Option requires an argument.\n");
+                    exit(1);
+                }
+                p2_size=atoi(optarg);
                 break;
             case 'v':
                 verbose = 1;
@@ -825,7 +857,7 @@ int main(int argc, char* argv[])
 {
     FastqReadPair read_pair;
     
-    printf("\nRADplex v0.5\n\n");
+    printf("\nRADplex v0.6\n\n");
     
     initialise_main();
 

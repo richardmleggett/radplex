@@ -88,7 +88,7 @@ void usage(void)
            "    [-c | --index] FASTQ index read.\n" \
            "    [-m | --mismatches] Number of allowed mismatches (default 1).\n" \
            "    [-p | --output_prefix] Output filename prefix.\n" \
-           "    [-s | --p2_size] Size of P2 adaptor read (default 7)." \
+           "    [-s | --p2_size] Size of P2 adaptor read (default 7).\n" \
            "    [-v | --verbose] Verbose output.\n" \
            "    [-z | --clip_psti] Clip PstI sequence too.\n" \
            "    [-1 | --p1] p1 Adaptor file.\n" \
